@@ -1,18 +1,32 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Sidebar from '@/components/Sidebar.vue'
+import { menuList, type MenuItem } from '@/config/menu'
 
 const router = useRouter()
 const route = useRoute()
 const collapsed = ref(false)
 
-const navItems = [
-  { path: '/', icon: '📊', label: '数据看板' },
-  { path: '/users', icon: '👥', label: '用户管理' },
-  { path: '/characters', icon: '🎭', label: '角色管理' },
-  { path: '/conversations', icon: '💬', label: '对话管理' },
-  { path: '/settings', icon: '⚙️', label: '系统设置' },
-]
+// 根据当前路由查找页面标题
+function findMenuTitle(items: MenuItem[], path: string): string | null {
+  for (const item of items) {
+    if (item.path === path) return item.title
+    if (item.children) {
+      const found = findMenuTitle(item.children, path)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+const pageTitle = ref('')
+
+// 监听路由变化更新标题
+import { watch } from 'vue'
+watch(() => route.path, (path) => {
+  pageTitle.value = findMenuTitle(menuList, path) || '管理后台'
+}, { immediate: true })
 
 function logout() {
   localStorage.removeItem('admin_token')
@@ -21,61 +35,87 @@ function logout() {
 </script>
 
 <template>
-  <div class="flex h-screen bg-[#0a0a0f]">
+  <div class="admin-layout">
     <!-- 侧边栏 -->
-    <aside
-      :class="['flex flex-col bg-[#111118] border-r border-white/5 transition-all duration-300', collapsed ? 'w-16' : 'w-56']"
-    >
-      <!-- Logo -->
-      <div class="flex items-center gap-3 px-4 h-14 border-b border-white/5">
-        <span class="text-xl">🎙️</span>
-        <span v-if="!collapsed" class="text-sm font-semibold text-white">TalkFlow Admin</span>
-      </div>
-
-      <!-- 导航 -->
-      <nav class="flex-1 py-3 space-y-1 px-2">
-        <router-link
-          v-for="item in navItems"
-          :key="item.path"
-          :to="item.path"
-          :class="[
-            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all',
-            route.path === item.path
-              ? 'bg-purple-500/15 text-purple-400'
-              : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
-          ]"
-        >
-          <span class="text-base">{{ item.icon }}</span>
-          <span v-if="!collapsed">{{ item.label }}</span>
-        </router-link>
-      </nav>
-
-      <!-- 底部 -->
-      <div class="p-3 border-t border-white/5">
-        <button
-          @click="collapsed = !collapsed"
-          class="w-full flex items-center justify-center py-2 text-gray-500 hover:text-gray-300 text-sm rounded-lg hover:bg-white/5 transition"
-        >
-          {{ collapsed ? '→' : '← 收起' }}
-        </button>
-      </div>
+    <aside class="admin-aside" :class="{ 'is-collapsed': collapsed }">
+      <Sidebar v-model:collapsed="collapsed" />
     </aside>
 
     <!-- 主内容 -->
-    <div class="flex-1 flex flex-col overflow-hidden">
+    <div class="admin-main">
       <!-- 顶栏 -->
-      <header class="flex items-center justify-between h-14 px-6 bg-[#111118] border-b border-white/5">
-        <h1 class="text-sm text-gray-400">{{ navItems.find(i => i.path === route.path)?.label || '管理后台' }}</h1>
-        <div class="flex items-center gap-4">
-          <span class="text-xs text-gray-500">管理员</span>
-          <button @click="logout" class="text-xs text-gray-500 hover:text-red-400 transition">退出</button>
+      <header class="admin-header">
+        <h1 class="header-title">{{ pageTitle }}</h1>
+        <div class="header-right">
+          <span class="header-user">管理员</span>
+          <el-button type="danger" text size="small" @click="logout">退出</el-button>
         </div>
       </header>
 
       <!-- 页面内容 -->
-      <main class="flex-1 overflow-y-auto p-6">
+      <main class="admin-content">
         <router-view />
       </main>
     </div>
   </div>
 </template>
+
+<style scoped>
+.admin-layout {
+  display: flex;
+  height: 100vh;
+  background-color: #0a0a0f;
+}
+
+.admin-aside {
+  flex-shrink: 0;
+  width: 220px;
+  transition: width 0.3s;
+  overflow: hidden;
+}
+
+.admin-aside.is-collapsed {
+  width: 64px;
+}
+
+.admin-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 24px;
+  background-color: #111118;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.header-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #9b9baf;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-user {
+  font-size: 12px;
+  color: #6b6b80;
+}
+
+.admin-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+</style>
